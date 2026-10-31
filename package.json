@@ -1,0 +1,22 @@
+{
+  "name": "midtown-guest",
+  "private": true,
+  "version": "1.0.0",
+  "description": "The Midtown Hotel \u2014 Manager App (React). Built by MACROPAGE / MR Tech Solutions Pvt Ltd.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173"
+  },
+  "dependencies": {
+    "@fontsource/fraunces": "5.1.0",
+    "@fontsource/plus-jakarta-sans": "5.1.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.4",
+    "vite": "5.4.11"
+  }
+}
