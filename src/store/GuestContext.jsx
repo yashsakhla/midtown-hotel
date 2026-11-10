@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError, session, setUnauthorizedHandler } from '../lib/api';
 import { addDays, today } from '../lib/format';
+import { normalizePhone, validateBooking } from '../lib/validate';
 import { mapBooking, mapMenu, mapOrders, mapRequests, mapRoomTypes, mapStay } from '../lib/mappers';
 
 const GuestContext = createContext(null);
@@ -56,15 +57,15 @@ export function GuestProvider({ children }) {
   }, [patch]);
 
   const loadAll = useCallback(async (mode) => {
+    if (mode === 'visitor') {
+      patch({ ...EMPTY, date: today(), roomTypes: mapRoomTypes(await api.publicRoomTypes()) });
+      return;
+    }
     const [menuRaw, typesRaw] = await Promise.all([api.menu(), api.roomTypes()]);
     const menu = mapMenu(menuRaw);
     menuRef.current = menu;
     patch({ menu, roomTypes: mapRoomTypes(typesRaw), date: today() });
-    if (mode === 'stay') {
-      await Promise.all([refreshStay(), refreshActivity()]);
-    } else {
-      patch({ stay: null, orders: [], requests: [] });
-    }
+    await Promise.all([refreshStay(), refreshActivity()]);
   }, [patch, refreshStay, refreshActivity]);
 
   const signOut = useCallback(() => {
@@ -80,10 +81,9 @@ export function GuestProvider({ children }) {
 
   /* restore a saved session */
   useEffect(() => {
-    const mode = session.mode();
-    if (!session.token() || !mode) { setAuth('out'); return; }
-    loadAll(mode)
-      .then(() => setAuth(mode))
+    if (!session.token() || session.mode() !== 'stay') { session.clear(); setAuth('out'); return; }
+    loadAll('stay')
+      .then(() => setAuth('stay'))
       .catch((e) => {
         if (e instanceof ApiError && e.status === 401) return; // handler already signed out
         toast(errMsg(e));
@@ -122,18 +122,29 @@ export function GuestProvider({ children }) {
     finally { setBusy(false); }
   }, [loadAll, toast]);
 
+  /** "Just browsing": nothing is stored and nobody is signed in. */
   const browseAsVisitor = useCallback(async () => {
     setBusy(true);
     try {
-      const res = await api.publicToken();
-      session.save(res.accessToken, 'visitor');
+      session.clear();
       await loadAll('visitor');
       setTab('rooms');
       setAuth('visitor');
       return true;
-    } catch (e) { session.clear(); toast(errMsg(e)); return false; }
+    } catch (e) { toast(errMsg(e)); return false; }
     finally { setBusy(false); }
   }, [loadAll, toast]);
+
+  /** Visitors confirm their mobile number with an OTP before a booking is sent. */
+  const sendBookingOtp = useCallback(async (phone) => {
+    setBusy(true);
+    try {
+      await api.publicBookingOtp(normalizePhone(phone));
+      toast('OTP sent to your mobile number');
+      return true;
+    } catch (e) { toast(errMsg(e)); return false; }
+    finally { setBusy(false); }
+  }, [toast]);
 
   /* ------------------------------------------------------------------ cart */
 
@@ -197,21 +208,24 @@ export function GuestProvider({ children }) {
 
   /* -------------------------------------------------------------- bookings */
 
-  const requestBooking = useCallback(async (form) => {
+  const requestBooking = useCallback(async (form, otp) => {
     const guest = (form.guest || '').trim();
-    if (!guest || !form.phone) { toast('Name and phone are needed'); return false; }
-
     const roomType = db.roomTypes.find((r) => r.type === form.type);
     if (!roomType) { toast('Pick a room type'); return false; }
+
+    const problems = validateBooking(form, roomType, today());
+    if (Object.keys(problems).length) { toast(Object.values(problems)[0]); return false; }
 
     const nights = Number(form.nights) || 1;
     const outD = form.outD || addDays(form.inD, nights);
 
     setBusy(true);
     try {
-      const res = await api.book({
+      const visitor = auth === 'visitor';
+      const res = await (visitor ? api.publicBook : api.book)({
         guestName: guest,
-        phone: form.phone,
+        phone: normalizePhone(form.phone),
+        ...(visitor ? { otp } : {}),
         roomTypeId: roomType.id,
         rooms: Number(form.rooms) || 1,
         pax: Number(form.pax) || 2,
@@ -222,12 +236,16 @@ export function GuestProvider({ children }) {
       const booking = mapBooking(res, { ...form, guest, outD, nights }, roomType);
       patch((d) => ({ bookings: [booking, ...d.bookings] }));
       closeSheet();
-      setTab('orders');
-      toast('Request sent — the hotel will confirm shortly');
+      if (visitor) {
+        toast(booking.ref ? `Request sent (ref ${booking.ref}) — the hotel will call you` : 'Request sent — the hotel will call you');
+      } else {
+        setTab('orders');
+        toast('Request sent — the hotel will confirm shortly');
+      }
       return true;
     } catch (e) { toast(errMsg(e)); return false; }
     finally { setBusy(false); }
-  }, [db.roomTypes, patch, closeSheet, toast]);
+  }, [db.roomTypes, auth, patch, closeSheet, toast]);
 
   /* ----------------------------------------------------------- check-out */
 
@@ -256,13 +274,13 @@ export function GuestProvider({ children }) {
   const value = useMemo(() => ({
     db, auth, busy, tab, setTab, sheet, openSheet, closeSheet, toastMsg, toast,
     actions: {
-      requestOtp, verifyOtp, browseAsVisitor, signOut,
+      requestOtp, verifyOtp, browseAsVisitor, sendBookingOtp, signOut,
       addToCart, changeQty, clearCart, placeOrder,
       requestService, requestBooking, requestCheckOut, saveFeedback
     }
   }), [
     db, auth, busy, tab, sheet, toastMsg, openSheet, closeSheet, toast,
-    requestOtp, verifyOtp, browseAsVisitor, signOut,
+    requestOtp, verifyOtp, browseAsVisitor, sendBookingOtp, signOut,
     addToCart, changeQty, clearCart, placeOrder,
     requestService, requestBooking, requestCheckOut, saveFeedback
   ]);

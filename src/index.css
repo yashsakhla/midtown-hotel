@@ -234,3 +234,10 @@ table{width:100%;border-collapse:collapse}td{padding:9px 0;border-bottom:1px sol
   .rooms,.menu{grid-template-columns:repeat(5,minmax(0,1fr))}
   .scr{padding-left:max(32px,calc((100% - 1240px)/2));padding-right:max(32px,calc((100% - 1240px)/2))}
 }
+
+/* "Just browsing" — rooms only, no tab bar */
+.phone.nonav .scr{padding-bottom:28px}
+@media(min-width:900px){
+  .phone.nonav{padding-left:0}
+  .phone.nonav .hd::before{display:none}
+}

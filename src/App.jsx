@@ -35,6 +35,18 @@ export default function App() {
     );
   }
 
+  if (auth === 'visitor') {
+    return (
+      <div className="phone nonav">
+        <TopBar />
+        <main className="scr"><RoomsScreen /></main>
+        <div className={`scrim${sheet ? ' on' : ''}`} onClick={closeSheet} />
+        <SheetHost />
+        <Toast />
+      </div>
+    );
+  }
+
   return (
     <div className="phone">
       <TopBar />

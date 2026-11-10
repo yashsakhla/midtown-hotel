@@ -1,6 +1,8 @@
 /** Thin client for the Midtown backend (/api/v1). Responses come wrapped as { data }. */
 
-const BASE = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '');
+// Backend location comes from .env.development / .env.production (see project root).
+export const BACKEND_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const BASE = BACKEND_URL + (import.meta.env.VITE_API_PREFIX || '/api/v1');
 const TOKEN_KEY = 'midtown.guest.token';
 const MODE_KEY = 'midtown.guest.mode'; // 'stay' (signed in with room + OTP) or 'visitor'
 
@@ -60,7 +62,11 @@ const post = (p, b = {}) => request('POST', p, b);
 export const api = {
   requestOtp: (roomNumber, phone) => post('/auth/guest/request-otp', { roomNumber, phone }),
   verifyOtp: (roomNumber, phone, otp) => post('/auth/guest/verify-otp', { roomNumber, phone, otp }),
-  publicToken: () => post('/auth/guest/public-token'),
+
+  // "Just browsing" — no login, no token. Needs these public endpoints on the backend.
+  publicRoomTypes: () => get('/public/room-types'),
+  publicBookingOtp: (phone) => post('/public/bookings/request-otp', { phone }),
+  publicBook: (payload) => post('/public/bookings', payload),
 
   stay: () => get('/guest/stay'),
   folio: () => get('/guest/folio'),

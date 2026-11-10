@@ -6,7 +6,8 @@ import Pill from '../components/Pill';
 import Sheet from '../components/Sheet';
 import Stepper from '../components/Stepper';
 import { HOTEL } from '../data/seed';
-import { addDays, money } from '../lib/format';
+import { addDays, money, today as todayISO } from '../lib/format';
+import { MAX_NIGHTS, MAX_ROOMS, validateBooking } from '../lib/validate';
 import { cartSubtotal, cartTax, cartTotal, folioTotal, signedMoney } from '../lib/selectors';
 import { useGuest } from '../store/GuestContext';
 
@@ -173,12 +174,17 @@ function FolioSheet() {
 /* --------------------------------------------------------- book a room */
 
 function BookSheet({ type }) {
-  const { db, actions, busy } = useGuest();
+  const { db, auth, actions, busy, toast } = useGuest();
+  const needOtp = auth === 'visitor';
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
   const [form, setForm] = useState({
-    guest: '', phone: '', type: type || db.roomTypes[0]?.type || '',
+    guest: db.stay?.guest || '', phone: db.stay?.phone || '', type: type || db.roomTypes[0]?.type || '',
     rooms: '1', pax: '2', nights: '1',
     inD: db.date, outD: addDays(db.date, 1), note: ''
   });
+  const [touched, setTouched] = useState({});
+  const touch = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const setIn = (e) => {
@@ -191,13 +197,37 @@ function BookSheet({ type }) {
   };
 
   const room = db.roomTypes.find((r) => r.type === form.type);
-  const estimate = (room?.tariff || 0) * (Number(form.nights) || 1) * (Number(form.rooms) || 1);
+  const errors = validateBooking(form, room, todayISO());
+  const err = (k) => (touched[k] ? errors[k] : undefined);
+  const submit = () => {
+    if (Object.keys(errors).length) {
+      setTouched({ guest: true, phone: true, inD: true, nights: true, rooms: true, pax: true });
+      toast(errors.rooms || 'Please fix the highlighted fields');
+      return;
+    }
+    if (needOtp && !otpSent) {
+      actions.sendBookingOtp(form.phone).then((ok) => { if (ok) setOtpSent(true); });
+      return;
+    }
+    if (needOtp && otp.trim().length < 4) { toast('Enter the OTP sent to your mobile'); return; }
+    actions.requestBooking(form, otp.trim());
+  };
+  const estimate = errors.nights || errors.rooms ? 0 : (room?.tariff || 0) * (Number(form.nights) || 1) * (Number(form.rooms) || 1);
 
   return (
     <Sheet
       title="Book a room"
-      footer={<button className="btn p" disabled={busy} onClick={() => actions.requestBooking(form)}>Send booking request</button>}
+      footer={<button className="btn p" disabled={busy} onClick={submit}>
+        {!needOtp ? 'Send booking request' : otpSent ? 'Verify OTP and book' : 'Send OTP to confirm'}
+      </button>}
     >
+      {db.stay && (
+        <div style={{ background: 'var(--wash)', color: 'var(--blue)', borderRadius: 11, padding: '11px 12px', fontSize: 12.5, marginBottom: 12 }}>
+          You are staying in room {db.stay.room}. Book other rooms as well — for family or friends, or for
+          another stay. We have filled in your name and number; change them if the booking is for someone else.
+        </div>
+      )}
+
       <img
         src={room?.img || ROOM_IMG[form.type]} alt={form.type}
         style={{ width: '100%', height: 130, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }}
@@ -210,19 +240,39 @@ function BookSheet({ type }) {
       </Field>
       {room && <p className="gd" style={{ marginTop: -6, marginBottom: 10 }}>{room.beds} · sleeps {room.sleeps}</p>}
 
-      <Field label="Your name" value={form.guest} onChange={set('guest')} />
-      <Field label="Phone" type="tel" placeholder="Mobile number" value={form.phone} onChange={set('phone')} />
+      <fieldset disabled={otpSent} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+      <Field label="Your name" maxLength={60} value={form.guest} error={err('guest')}
+        onChange={set('guest')} onBlur={touch('guest')} />
+      <Field label="Phone" type="tel" inputMode="numeric" maxLength={14} placeholder="10-digit mobile number"
+        value={form.phone} error={err('phone')} onChange={set('phone')} onBlur={touch('phone')} />
 
       <Row2>
-        <Field label="Arrival" type="date" value={form.inD} onChange={setIn} />
-        <Field label="Nights" type="number" value={form.nights} onChange={setNights} />
+        <Field label="Arrival" type="date" min={todayISO()} value={form.inD} error={err('inD')}
+          onChange={setIn} onBlur={touch('inD')} />
+        <Field label="Nights" type="number" inputMode="numeric" min={1} max={MAX_NIGHTS} value={form.nights}
+          error={err('nights')} onChange={setNights} onBlur={touch('nights')} />
       </Row2>
       <Row2>
-        <Field label="Rooms" type="number" value={form.rooms} onChange={set('rooms')} />
-        <Field label="Guests" type="number" value={form.pax} onChange={set('pax')} />
+        <Field label={`Rooms (max ${MAX_ROOMS})`} type="number" inputMode="numeric" min={1} value={form.rooms}
+          error={errors.rooms && (touched.rooms || Number(form.rooms) > MAX_ROOMS) ? errors.rooms : undefined}
+          onChange={set('rooms')} onBlur={touch('rooms')} />
+        <Field label="Guests" type="number" inputMode="numeric" min={1} value={form.pax}
+          error={err('pax')} onChange={set('pax')} onBlur={touch('pax')} />
       </Row2>
 
-      <Field label="Anything we should know?" placeholder="Late arrival, extra bed…" value={form.note} onChange={set('note')} />
+      <Field label="Anything we should know?" maxLength={200} placeholder="Late arrival, extra bed…" value={form.note} onChange={set('note')} />
+      </fieldset>
+
+      {otpSent && (
+        <>
+          <Field label={`OTP sent to ${form.phone}`} inputMode="numeric" maxLength={6} placeholder="6-digit code"
+            value={otp} onChange={(e) => setOtp(e.target.value)} />
+          <button className="btn sm" style={{ marginBottom: 12 }} disabled={busy}
+            onClick={() => { setOtpSent(false); setOtp(''); }}>
+            Change details
+          </button>
+        </>
+      )}
 
       <table>
         <tbody>
