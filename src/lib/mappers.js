@@ -34,7 +34,10 @@ export const mapRoomTypes = (data) =>
     return {
       id: r.id,
       type: name,
-      tariff: num(r.tariff ?? r.rate ?? r.price),
+      singleRate: num(r.singleRate ?? r.tariff ?? r.rate ?? r.price),
+      doubleRate: num(r.doubleRate ?? r.singleRate ?? r.tariff ?? r.rate ?? r.price),
+      additionalGuestRate: num(r.additionalGuestRate),
+      tariff: num(r.singleRate ?? r.tariff ?? r.rate ?? r.price),
       beds: r.beds || fb.beds || '',
       size: r.sizeSqft ? `${r.sizeSqft} sq ft` : fb.size || '',
       sleeps: r.sleeps ?? fb.sleeps ?? 2,
@@ -44,29 +47,57 @@ export const mapRoomTypes = (data) =>
     };
   });
 
-export function mapStay(stayData, folioData) {
-  const s = stayData?.stay || stayData || {};
-  const room = stayData?.room || s.room || {};
-  const lines = list(folioData, 'lines').map((l, i) => ({
+const BOOKING_STATUS = ['REQUESTED', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'];
+export const STATUS_LABEL = {
+  REQUESTED: 'Requested', CONFIRMED: 'Confirmed', CHECKED_IN: 'Staying',
+  CHECKED_OUT: 'Checked out', CANCELLED: 'Cancelled'
+};
+
+/** One booking can hold several rooms; each room has its own stay id (used for service requests). */
+export function mapBookings(data) {
+  return list(data, 'bookings', 'items').map((b) => {
+    const status = BOOKING_STATUS.includes(String(b.status).toUpperCase()) ? String(b.status).toUpperCase() : 'REQUESTED';
+    const arrival = dateOnly(b.arrivalDate || b.checkIn);
+    const departure = dateOnly(b.departureDate || b.checkOut);
+    const nights = b.nights ?? (arrival && departure ? Math.round((new Date(departure) - new Date(arrival)) / 864e5) : 0);
+    return {
+      id: b.id,
+      ref: b.ref || b.reference || '',
+      status,
+      guest: b.guestName || '',
+      phone: b.phone || '',
+      arrival,
+      departure,
+      nights: num(nights),
+      pax: num(b.pax, 0),
+      rooms: list(b.rooms, 'items').map((r) => ({
+        stayId: r.stayId || r.id,
+        number: String(r.roomNumber ?? r.number ?? ''),
+        type: r.roomType || r.type || '',
+        rate: num(r.rate),
+        guest: r.guestName || b.guestName || '',
+        status: String(r.status || status).toUpperCase()
+      })),
+      amount: num(b.amount ?? b.total),
+      balance: num(b.balance),
+      invoiceUrl: b.invoiceUrl || ''
+    };
+  });
+}
+
+export function mapFolio(data) {
+  const lines = list(data, 'lines').map((l, i) => ({
     id: l.id || `L${i}`,
     head: l.head || l.description || l.narration || 'Charge',
+    room: l.roomNumber ? String(l.roomNumber) : '',
     amount: num(l.amount)
   }));
   const total = lines.reduce((t, l) => t + l.amount, 0);
-  const checkIn = dateOnly(s.checkIn || s.checkInDate);
-  const checkOut = dateOnly(s.checkOut || s.checkOutDate);
-  const nights = s.nights ?? (checkIn && checkOut ? Math.round((new Date(checkOut) - new Date(checkIn)) / 864e5) : 0);
   return {
-    room: String(room.number ?? s.roomNumber ?? ''),
-    type: room.roomType?.name || room.roomTypeName || room.type || s.roomType || '',
-    guest: s.guestName || '',
-    phone: s.phone || '',
-    checkIn,
-    checkOut,
-    nights: num(nights),
-    rate: num(s.rate ?? room.rate ?? room.roomType?.tariff),
-    folio: lines,
-    balance: folioData?.balance != null ? num(folioData.balance) : total
+    lines,
+    balance: data?.balance != null ? num(data.balance) : total,
+    paid: num(data?.paid),
+    invoiceUrl: data?.invoiceUrl || ''
   };
 }
 
@@ -96,6 +127,7 @@ export const mapOrders = (data, menu) =>
       items,
       total: num(k.total ?? k.amount, Math.round(sub * 1.05)),
       note: k.note || '',
+      room: k.roomNumber ? String(k.roomNumber) : '',
       billTo: k.billTo === 'ROOM' ? 'room' : 'pay'
     };
   });
@@ -109,23 +141,6 @@ export const mapRequests = (data) =>
     label: r.label || r.key,
     time: clock(r.createdAt || r.time),
     status: REQUEST_STATUS[String(r.status).toUpperCase()] || 'Sent',
-    note: r.note || ''
+    note: r.note || '',
+    rooms: list(r.rooms, 'items').map((x) => String(x.roomNumber ?? x.number ?? x)).filter(Boolean)
   }));
-
-export const mapBooking = (data, form, roomType) => {
-  const b = data?.booking || data || {};
-  return {
-    id: b.id,
-    ref: b.ref || b.reference || '',
-    guest: form.guest,
-    phone: form.phone,
-    type: roomType?.type || form.type,
-    rooms: num(form.rooms, 1),
-    pax: num(form.pax, 2),
-    inD: form.inD,
-    outD: form.outD,
-    nights: num(form.nights, 1),
-    amount: num(b.amount, num(roomType?.tariff) * num(form.nights, 1) * num(form.rooms, 1)),
-    status: b.status === 'CONFIRMED' ? 'Confirmed' : 'Requested'
-  };
-};

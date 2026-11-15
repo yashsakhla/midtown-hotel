@@ -4,7 +4,7 @@
 export const BACKEND_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const BASE = BACKEND_URL + (import.meta.env.VITE_API_PREFIX || '/api/v1');
 const TOKEN_KEY = 'midtown.guest.token';
-const MODE_KEY = 'midtown.guest.mode'; // 'stay' (signed in with room + OTP) or 'visitor'
+const MODE_KEY = 'midtown.guest.mode'; // 'customer' (signed in with phone + OTP) or 'visitor'
 
 export class ApiError extends Error {
   constructor(status, message) {
@@ -60,23 +60,25 @@ const get = (p) => request('GET', p);
 const post = (p, b = {}) => request('POST', p, b);
 
 export const api = {
-  requestOtp: (roomNumber, phone) => post('/auth/guest/request-otp', { roomNumber, phone }),
-  verifyOtp: (roomNumber, phone, otp) => post('/auth/guest/verify-otp', { roomNumber, phone, otp }),
+  // Phone-only login: no room number. The backend finds (or creates) the customer by phone.
+  requestOtp: (phone) => post('/auth/guest/request-otp', { phone }),
+  verifyOtp: (phone, otp) => post('/auth/guest/verify-otp', { phone, otp }),
 
   // "Just browsing" — no login, no token. Needs these public endpoints on the backend.
   publicRoomTypes: () => get('/public/room-types'),
   publicBookingOtp: (phone) => post('/public/bookings/request-otp', { phone }),
   publicBook: (payload) => post('/public/bookings', payload),
 
-  stay: () => get('/guest/stay'),
-  folio: () => get('/guest/folio'),
+  me: () => get('/guest/me'),
+  bookings: () => get('/guest/bookings'),
+  bookingFolio: (bookingId) => get(`/guest/bookings/${encodeURIComponent(bookingId)}/folio`),
   menu: () => get('/guest/menu'),
   roomTypes: () => get('/guest/room-types'),
   orders: () => get('/guest/orders'),
   placeOrder: (payload) => post('/guest/orders', payload),
   serviceRequests: () => get('/guest/service-requests'),
-  sendServiceRequest: (key, note) => post('/guest/service-requests', { key, note }),
-  checkoutRequest: (note) => post('/guest/checkout-request', { note }),
-  feedback: (rating, text) => post('/guest/feedback', { rating, text }),
+  sendServiceRequest: (key, note, stayIds) => post('/guest/service-requests', { key, note, stayIds }),
+  checkoutRequest: (note, stayIds) => post('/guest/checkout-request', { note, stayIds }),
+  feedback: (rating, text, bookingId) => post('/guest/feedback', { rating, text, bookingId }),
   book: (payload) => post('/guest/bookings', payload)
 };

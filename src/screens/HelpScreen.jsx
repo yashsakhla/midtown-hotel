@@ -3,10 +3,13 @@ import Card from '../components/Card';
 import ListRow from '../components/ListRow';
 import Pill from '../components/Pill';
 import { HOTEL, SERVICES } from '../data/seed';
+import { activeBookings, hasActiveStay, pastBookings } from '../lib/selectors';
 import { useGuest } from '../store/GuestContext';
 
 export default function HelpScreen() {
   const { db, openSheet, actions } = useGuest();
+  const live = hasActiveStay(db);
+  const reviewable = activeBookings(db)[0] || pastBookings(db).find((b) => b.status === 'CHECKED_OUT');
 
   return (
     <>
@@ -38,7 +41,7 @@ export default function HelpScreen() {
         </table>
       </Card>
 
-      {db.stay && <Card title="Ask the front desk">
+      {live && <Card title="Ask the front desk">
         {SERVICES.map((s) => (
           <ListRow
             key={s.key}
@@ -61,7 +64,7 @@ export default function HelpScreen() {
         </table>
       </Card>
 
-      {db.stay && <Card title="How was your stay?">
+      {reviewable && <Card title="How was your stay?">
         {db.feedback ? (
           <ListRow
             title={`You rated us ${db.feedback.rating} out of 5`}
@@ -72,7 +75,7 @@ export default function HelpScreen() {
           <ListRow>
             <span style={{ color: 'var(--muted)' }}>Tell the manager what we got right or wrong.</span>
             <button className="btn sm" style={{ marginLeft: 'auto', width: 'auto', padding: '8px 14px' }}
-              onClick={() => openSheet('feedback')}>
+              onClick={() => openSheet('feedback', { bookingId: reviewable.id })}>
               Rate us
             </button>
           </ListRow>
@@ -80,7 +83,7 @@ export default function HelpScreen() {
       </Card>}
 
       <button className="btn" onClick={actions.signOut}>
-        {db.stay ? 'Sign out' : 'Back to sign-in'}
+        {db.customer ? 'Sign out' : 'Back to sign-in'}
       </button>
 
       <p style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', margin: '14px 0 0' }}>

@@ -9,7 +9,11 @@ export const normalizePhone = (v) => String(v || '').replace(/[\s-]/g, '').repla
 
 const whole = (v) => (/^\d+$/.test(String(v).trim()) ? Number(v) : NaN);
 
-export function validateBooking(form, room, today) {
+/**
+ * form.lines = [{ type, guests }], one per room. Each room's guests are capped at that
+ * room type's `sleeps`. Returns { field: message }, with `lines` as an array of messages.
+ */
+export function validateBooking(form, roomTypes, today) {
   const e = {};
 
   const name = (form.guest || '').trim();
@@ -26,14 +30,19 @@ export function validateBooking(form, room, today) {
   if (!(nights >= 1)) e.nights = 'At least 1 night';
   else if (nights > MAX_NIGHTS) e.nights = `Up to ${MAX_NIGHTS} nights online — call the front desk for longer stays`;
 
-  const rooms = whole(form.rooms);
-  if (!(rooms >= 1)) e.rooms = 'At least 1 room';
-  else if (rooms > MAX_ROOMS) e.rooms = BULK_MESSAGE;
+  const lines = form.lines || [];
+  if (!lines.length) e.rooms = 'Add at least one room';
+  else if (lines.length > MAX_ROOMS) e.rooms = BULK_MESSAGE;
 
-  const pax = whole(form.pax);
-  const cap = (room?.sleeps || 2) * (rooms >= 1 && rooms <= MAX_ROOMS ? rooms : 1);
-  if (!(pax >= 1)) e.pax = 'At least 1 guest';
-  else if (pax > cap) e.pax = `This room sleeps ${room?.sleeps || 2} — max ${cap} guest${cap > 1 ? 's' : ''} for ${rooms >= 1 ? rooms : 1} room${rooms > 1 ? 's' : ''}`;
+  const lineErrors = lines.map((l) => {
+    const type = roomTypes.find((r) => r.type === l.type);
+    if (!type) return 'Pick a room type';
+    const g = whole(l.guests);
+    if (!(g >= 1)) return 'At least 1 guest';
+    if (g > (type.sleeps || 2)) return `${type.type} sleeps ${type.sleeps || 2} — max ${type.sleeps || 2} guests per room`;
+    return '';
+  });
+  if (lineErrors.some(Boolean)) e.lines = lineErrors;
 
   return e;
 }

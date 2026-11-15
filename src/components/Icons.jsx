@@ -3,7 +3,7 @@
 const stroke = { strokeLinecap: 'round', strokeLinejoin: 'round' };
 
 export const TAB_ICONS = {
-  stay: 'M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z',
+  home: 'M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z',
   rooms: 'M4 21V7l8-4 8 4v14M9 21v-5h6v5',
   menu: 'M7 3v8a3 3 0 006 0V3M10 11v10M17 3c-1.5 2-2 4-2 6h4c0-2-.5-4-2-6zM17 9v12',
   orders: 'M6 3h9l5 5v13H6zM15 3v5h5M9 13h7M9 17h5',

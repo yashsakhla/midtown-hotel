@@ -36,7 +36,7 @@ export default function RoomsScreen() {
 
             <div className="gfoot">
               <div className="num gp">
-                {money(r.tariff)} <small>/ night + GST</small>
+                <small>From</small> {money(r.singleRate || r.tariff)} <small>/ night + GST</small>
               </div>
               <button
                 className="btn p sm"

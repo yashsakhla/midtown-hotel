@@ -1,8 +1,9 @@
 import { HOTEL } from '../data/seed';
+import { activeRooms } from '../lib/selectors';
 import { useGuest } from '../store/GuestContext';
 
 const SUBTITLES = {
-  stay: 'Your stay',
+  home: 'Your bookings',
   rooms: 'Rooms & tariff',
   menu: 'In-room dining',
   orders: 'Orders & requests',
@@ -10,7 +11,8 @@ const SUBTITLES = {
 };
 
 export default function TopBar() {
-  const { db, auth, tab, openSheet, actions } = useGuest();
+  const { db, auth, tab, setTab, actions } = useGuest();
+  const rooms = activeRooms(db);
 
   return (
     <header className="hd">
@@ -22,9 +24,9 @@ export default function TopBar() {
       {auth === 'visitor' && (
         <button className="btn sm" onClick={actions.signOut}>Sign in</button>
       )}
-      {db.stay && (
-        <button className="btn sm" onClick={() => openSheet('folio')}>
-          Room {db.stay.room}
+      {auth === 'in' && rooms.length > 0 && (
+        <button className="btn sm" onClick={() => setTab('home')}>
+          {rooms.length === 1 ? `Room ${rooms[0].number}` : `${rooms.length} rooms`}
         </button>
       )}
     </header>

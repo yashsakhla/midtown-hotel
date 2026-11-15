@@ -2,18 +2,18 @@ import TabBar from './components/TabBar';
 import Toast from './components/Toast';
 import TopBar from './components/TopBar';
 import { money } from './lib/format';
-import { cartCount, cartTotal } from './lib/selectors';
+import { cartCount, cartTotal, hasActiveStay } from './lib/selectors';
 import LoginScreen from './screens/LoginScreen';
 import HelpScreen from './screens/HelpScreen';
 import MenuScreen from './screens/MenuScreen';
 import OrdersScreen from './screens/OrdersScreen';
 import RoomsScreen from './screens/RoomsScreen';
-import StayScreen from './screens/StayScreen';
+import HomeScreen from './screens/HomeScreen';
 import SheetHost from './sheets';
 import { useGuest } from './store/GuestContext';
 
 const SCREENS = {
-  stay: StayScreen,
+  home: HomeScreen,
   rooms: RoomsScreen,
   menu: MenuScreen,
   orders: OrdersScreen,
@@ -23,12 +23,13 @@ const SCREENS = {
 export default function App() {
   const { db, auth, tab, sheet, openSheet, closeSheet } = useGuest();
 
-  const Screen = SCREENS[tab];
+  const live = hasActiveStay(db);
+  const Screen = SCREENS[!live && (tab === 'menu' || tab === 'orders') ? 'home' : tab];
   const count = cartCount(db);
 
   if (auth === 'loading' || auth === 'out') {
     return (
-      <div className="phone">
+      <div className="phone login-page">
         {auth === 'out' ? <LoginScreen /> : <p style={{ margin: 'auto', color: 'var(--muted)' }}>Loading…</p>}
         <Toast />
       </div>
@@ -51,12 +52,12 @@ export default function App() {
     <div className="phone">
       <TopBar />
 
-      <main className="scr" key={tab}>
+      <main className="scr" key={Screen.name}>
         <Screen />
       </main>
 
       {/* The tray bar replaces the FAB — it only appears when something is in it. */}
-      {count > 0 && !sheet && (
+      {live && count > 0 && !sheet && (
         <button className="cartbar" onClick={() => openSheet('cart')}>
           <span className="cc">{count}</span>
           View tray

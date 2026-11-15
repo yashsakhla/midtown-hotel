@@ -6,7 +6,7 @@ import { ORDER_STEPS, orderStep } from '../lib/selectors';
 import { useGuest } from '../store/GuestContext';
 
 export default function OrdersScreen() {
-  const { db, setTab } = useGuest();
+  const { setTab, db } = useGuest();
 
   return (
     <>
@@ -18,7 +18,7 @@ export default function OrdersScreen() {
                 <div className="t" style={{ flex: 1 }}>
                   <b>{o.items.map((i) => `${i.q}× ${i.n}`).join(', ')}</b>
                   <span>
-                    {o.kind} · {o.time}
+                    {o.kind}{o.room ? ` · Room ${o.room}` : ''} · {o.time}
                     {o.billTo === 'room' ? ' · charged to room' : ''}
                     {o.note ? ` · “${o.note}”` : ''}
                   </span>
@@ -49,34 +49,11 @@ export default function OrdersScreen() {
           <ListRow
             key={r.id}
             title={r.label}
-            sub={r.note ? `${r.note} · ${r.time}` : `Sent at ${r.time}`}
+            sub={`${r.rooms.length ? `Room ${r.rooms.join(', ')} · ` : ''}${r.note ? `${r.note} · ${r.time}` : `Sent at ${r.time}`}`}
             right={<Pill tone={r.status === 'Done' ? 'g' : 'o'}>{r.status}</Pill>}
           />
         )) : (
           <ListRow><span style={{ color: 'var(--muted)' }}>No requests raised.</span></ListRow>
-        )}
-      </Card>
-
-      <Card title="Booking requests">
-        {db.bookings.length ? db.bookings.map((b) => (
-          <ListRow key={b.id}>
-            <div className="t">
-              <b>{b.type} × {b.rooms}</b>
-              <span>{b.ref} · {b.inD} → {b.outD} · {b.pax} guests</span>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div className="num" style={{ color: 'var(--ink)' }}>{money(b.amount)}</div>
-              <Pill tone={b.status === 'Confirmed' ? 'g' : 'o'}>{b.status}</Pill>
-            </div>
-          </ListRow>
-        )) : (
-          <ListRow>
-            <span style={{ color: 'var(--muted)' }}>No booking requests.</span>
-            <button className="btn sm" style={{ marginLeft: 'auto', width: 'auto', padding: '8px 14px' }}
-              onClick={() => setTab('rooms')}>
-              Book a room
-            </button>
-          </ListRow>
         )}
       </Card>
     </>

@@ -241,3 +241,29 @@ table{width:100%;border-collapse:collapse}td{padding:9px 0;border-bottom:1px sol
   .phone.nonav{padding-left:0}
   .phone.nonav .hd::before{display:none}
 }
+
+/* Login: centred on every screen size */
+.scr.login{display:flex;align-items:center;justify-content:center;padding-bottom:28px}
+.login-box{width:100%;max-width:420px}
+@media(min-width:900px){
+  .phone.login-page{padding-left:0}
+  .scr.login{display:flex;padding:32px}
+  .login-box{background:transparent}
+}
+
+/* Room picker (multi-select) */
+.picker{border:1px solid var(--line);border-radius:12px;padding:6px 12px 10px;margin:0 0 12px;min-width:0}
+.picker legend{font-size:12px;font-weight:600;color:var(--body);padding:0 6px}
+.pk{display:flex;align-items:center;gap:10px;margin:0;padding:9px 0;font-weight:500;font-size:13.5px;color:var(--body);cursor:pointer;border-top:1px solid var(--line)}
+.pk:first-of-type{border-top:0}
+.pk input{width:18px;height:18px;flex:none;accent-color:var(--blue)}
+.pk b{color:var(--ink)}
+.pk.all{font-weight:700}
+
+/* Rooms shown on the stay card */
+.chipset{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chipset span{background:rgba(255,255,255,.12);color:#EDE7D8;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:600}
+
+/* One room inside the booking form */
+.roomline{border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;background:#fff}
+.rl-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;color:var(--ink)}

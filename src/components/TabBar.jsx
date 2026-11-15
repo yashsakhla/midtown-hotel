@@ -1,8 +1,9 @@
+import { hasActiveStay } from '../lib/selectors';
 import { useGuest } from '../store/GuestContext';
 import { TabIcon } from './Icons';
 
 const TABS = [
-  ['stay', 'My stay'],
+  ['home', 'Home'],
   ['rooms', 'Rooms'],
   ['menu', 'Menu'],
   ['orders', 'Orders'],
@@ -10,11 +11,13 @@ const TABS = [
 ];
 
 export default function TabBar() {
-  const { tab, setTab } = useGuest();
+  const { db, tab, setTab } = useGuest();
+  // Food and orders only make sense while the customer is staying.
+  const tabs = hasActiveStay(db) ? TABS : TABS.filter(([id]) => id !== 'menu' && id !== 'orders');
 
   return (
     <nav className="tb" aria-label="Main sections">
-      {TABS.map(([id, label]) => (
+      {tabs.map(([id, label]) => (
         <button
           key={id}
           className={tab === id ? 'on' : ''}
